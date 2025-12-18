@@ -121,7 +121,6 @@
         let currentUser = null;
         let playerAvatarImg = null;
 
-        // FIXED: Explicit redirect to your GitHub Pages URL to avoid localhost:3000 error
         async function signInWithGoogle() {
             const { error } = await sbClient.auth.signInWithOAuth({
                 provider: 'google',
@@ -166,14 +165,12 @@
                 document.getElementById('game-container').classList.remove('hidden');
                 document.getElementById('user-nav').classList.remove('hidden');
                 
-                // Set name based on Google profile or manual signup
-                const name = meta.display_name || meta.full_name || "Warrior";
+                const name = meta.full_name || meta.display_name || "Warrior";
                 document.getElementById('nav-name').innerText = name;
 
-                // Load Google Profile Picture for troops
                 if (meta.avatar_url) {
                     playerAvatarImg = new Image();
-                    playerAvatarImg.crossOrigin = "anonymous"; // Important for Canvas security
+                    playerAvatarImg.crossOrigin = "anonymous";
                     playerAvatarImg.src = meta.avatar_url;
                 }
                 
@@ -307,7 +304,7 @@
         }
 
         function sendAttack() {
-            const name = currentUser.user_metadata.display_name || currentUser.user_metadata.full_name || "Warrior";
+            const name = currentUser.user_metadata.full_name || currentUser.user_metadata.display_name || "Warrior";
             arenaChannel.send({ type: 'broadcast', event: 'freeze_attack', payload: { user: name } });
         }
 
@@ -343,15 +340,18 @@
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('final-time').innerText = `Battle Time: ${time}s`;
             
-            const name = currentUser.user_metadata.display_name || currentUser.user_metadata.full_name || "Warrior";
+            // Capture latest name from Google
+            const meta = currentUser.user_metadata;
+            const name = meta.full_name || meta.display_name || "Warrior";
 
-            await sbClient.from('scores').upsert({ 
+            const { error } = await sbClient.from('scores').upsert({ 
                 user_id: currentUser.id, 
                 display_name: name, 
                 time_taken: time 
             }, { onConflict: 'user_id' });
             
-            loadLeaderboard();
+            if (error) console.error("Error saving score:", error.message);
+            loadLeaderboard(); // Refresh right after save
         }
 
         function restartMatch() {
@@ -359,7 +359,11 @@
         }
 
         async function loadLeaderboard() {
-            const { data } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(20);
+            const { data, error } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(20);
+            if (error) {
+                console.error("Leaderboard error:", error.message);
+                return;
+            }
             if (data) {
                 document.getElementById('leaderboard-list').innerHTML = data.map((s, i) => 
                     `<div class="score-entry">${i+1}. <strong>${s.display_name}</strong> - ${s.time_taken}s</div>`
