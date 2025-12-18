@@ -78,7 +78,7 @@
     <div id="results" class="hidden">
         <h2>Match Finished!</h2>
         <p id="final-time"></p>
-        <button class="btn-attack" onclick="location.reload()">New Match</button>
+        <button class="btn-attack" onclick="restartMatch()">Next Match (Keep Elixir)</button>
     </div>
 
     <div id="leaderboard">
@@ -104,8 +104,6 @@
         let username = "";
         let personalBest = null;
         let elixir = 0;
-        
-        // Ice Break variables
         let iceAnswersCorrect = 0;
         let isFrozen = false;
 
@@ -114,7 +112,6 @@
         });
 
         arenaChannel.on('broadcast', { event: 'freeze_attack' }, (payload) => {
-            console.log("Incoming attack from:", payload.payload.user);
             applyFreezeEffect();
         }).subscribe();
 
@@ -128,6 +125,17 @@
             document.getElementById('quiz').classList.remove('hidden');
             
             await fetchPersonalBest();
+            startTime = Date.now();
+            showQuestion();
+            updateElixirUI(); // Ensure button is correct state
+        }
+
+        // NEW: Soft Reset Function
+        function restartMatch() {
+            currentQ = 0;
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
             startTime = Date.now();
             showQuestion();
         }
@@ -186,10 +194,8 @@
             }
         }
 
-        // --- ICE BREAK LOGIC ---
-
         function applyFreezeEffect() {
-            if (isFrozen) return; // Don't freeze if already frozen
+            if (isFrozen) return;
             isFrozen = true;
             iceAnswersCorrect = 0;
             document.getElementById('ice-overlay').style.display = 'flex';
@@ -201,13 +207,8 @@
             const n1 = Math.floor(Math.random() * 12) + 1;
             const n2 = Math.floor(Math.random() * 12) + 1;
             const correct = n1 + n2;
-
             document.getElementById('ice-question').innerText = `${n1} + ${n2} = ?`;
-            
-            // Create 3 random options
-            let opts = [correct, correct + 2, correct - 1];
-            opts = opts.sort(() => Math.random() - 0.5);
-
+            let opts = [correct, correct + 2, correct - 1].sort(() => Math.random() - 0.5);
             const iceOptionsDiv = document.getElementById('ice-options');
             iceOptionsDiv.innerHTML = '';
             opts.forEach(o => {
@@ -230,12 +231,10 @@
             });
         }
 
-        // --- END ICE BREAK LOGIC ---
-
         async function finishQuiz() {
             const timeTaken = (Date.now() - startTime) / 1000;
             document.getElementById('quiz').classList.add('hidden');
-            document.getElementById('game-ui').classList.add('hidden');
+            // Note: We DON'T hide game-ui here so you can still attack people while looking at your results!
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('final-time').innerText = `Battle Time: ${timeTaken}s`;
 
