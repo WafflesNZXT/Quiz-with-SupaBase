@@ -147,7 +147,14 @@
 
             const list = document.getElementById('leaderboard-list');
             if (data && data.length > 0) {
-                list.innerHTML = data.map(s => `<div class="score-entry"><strong>${s.username}</strong>: ${s.time_taken}s</div>`).join('');
+                list.innerHTML = data.map((s, index) => {
+                    let medal = '';
+                    if (index === 0) medal = '🥇 1st Place: ';
+                    else if (index === 1) medal = '🥈 2nd Place: ';
+                    else if (index === 2) medal = '🥉 3rd Place: ';
+                    
+                    return `<div class="score-entry">${medal}<strong>${s.username}</strong>: ${s.time_taken}s</div>`;
+                }).join('');
             } else {
                 list.innerHTML = "No scores yet. Be the first!";
             }
