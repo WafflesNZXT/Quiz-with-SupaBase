@@ -38,9 +38,7 @@
         .btn-blue:disabled { background: #7f8c8d; border: none; cursor: not-allowed; }
         .option-btn { width: 100%; background: #ecf0f1; color: #333; border-bottom: 4px solid #bdc3c7; }
 
-        /* Ice Overlay */
         #ice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(135, 206, 250, 0.9); backdrop-filter: blur(8px); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; }
-
         #leaderboard { background: rgba(0,0,0,0.3); padding: 15px; margin-top: 20px; border-radius: 12px; }
         .score-entry { padding: 8px; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         #user-nav { position: absolute; top: 10px; right: 10px; z-index: 50; }
@@ -119,15 +117,15 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwcWJyeXRzeHNzd2phYm9uYm94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMjg3NjUsImV4cCI6MjA4MTYwNDc2NX0.elSX1XfvfAAJZyW-6JBhMpONz1zuBBH7GZiV-Vax0EE';
         const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // --- AUTH LOGIC ---
         let isSignUpMode = false;
         let currentUser = null;
         let playerAvatarImg = null;
 
+        // FIXED: Explicit redirect to your GitHub Pages URL to avoid localhost:3000 error
         async function signInWithGoogle() {
             const { error } = await sbClient.auth.signInWithOAuth({
                 provider: 'google',
-                options: { redirectTo: window.location.origin + window.location.pathname }
+                options: { redirectTo: 'https://wafflesnzxt.github.io/Quiz-with-SupaBase/' }
             });
             if (error) alert(error.message);
         }
@@ -164,22 +162,23 @@
                 currentUser = session.user;
                 const meta = currentUser.user_metadata;
                 
-                // Hide Login, Show Game
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('game-container').classList.remove('hidden');
                 document.getElementById('user-nav').classList.remove('hidden');
                 
-                // Setup Profile
+                // Set name based on Google profile or manual signup
                 const name = meta.display_name || meta.full_name || "Warrior";
                 document.getElementById('nav-name').innerText = name;
 
-                // Load Avatar if exists
+                // Load Google Profile Picture for troops
                 if (meta.avatar_url) {
                     playerAvatarImg = new Image();
+                    playerAvatarImg.crossOrigin = "anonymous"; // Important for Canvas security
                     playerAvatarImg.src = meta.avatar_url;
                 }
                 
                 startQuiz();
+                loadLeaderboard();
             }
         }
 
@@ -188,7 +187,6 @@
             location.reload();
         }
 
-        // --- CANVAS ENGINE ---
         const canvas = document.getElementById('battleCanvas');
         const ctx = canvas.getContext('2d');
         let troops = [];
@@ -212,13 +210,12 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#8e44ad';
-            ctx.fillRect(0, 70, canvas.width, 10); // Bridge
+            ctx.fillRect(0, 70, canvas.width, 10); 
             
             troops.forEach((t, index) => {
                 t.x += t.speed;
                 
                 if (t.isMine && playerAvatarImg && playerAvatarImg.complete) {
-                    // Draw Google Profile Pic
                     ctx.save();
                     ctx.beginPath();
                     ctx.arc(t.x + 15, t.y + 5, 15, 0, Math.PI * 2);
@@ -226,7 +223,6 @@
                     ctx.drawImage(playerAvatarImg, t.x, t.y - 10, 30, 30);
                     ctx.restore();
                 } else {
-                    // Draw Emoji
                     ctx.font = '32px serif';
                     ctx.fillText(t.isMine ? '⚔️' : '🔥', t.x, t.y + 10);
                 }
@@ -244,7 +240,6 @@
         }
         draw();
 
-        // --- GAME LOGIC ---
         const questions = [
             { q: "What is 10 + 10?", a: ["20", "21", "19"], correct: "20" },
             { q: "Which is the main resource?", a: ["Gold", "Elixir", "Wood"], correct: "Elixir" },
@@ -373,7 +368,6 @@
         }
 
         checkSession();
-        loadLeaderboard();
     </script>
 </body>
 </html>
