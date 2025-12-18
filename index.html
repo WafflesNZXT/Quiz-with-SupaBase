@@ -3,266 +3,266 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz Royale: Battle Edition</title>
+    <title>Quiz Royale: 2D Battle</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; transition: filter 0.3s; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; background: #2c3e50; color: white; overflow-x: hidden; }
         .hidden { display: none; }
         
-        /* Game UI */
-        #game-ui { margin-bottom: 20px; display: flex; justify-content: center; gap: 10px; align-items: center; }
-        .elixir-container { background: #34495e; padding: 10px 20px; border-radius: 30px; color: #ff00ff; font-weight: bold; border: 3px solid #8e44ad; box-shadow: 0 4px 0 #71368a; }
-        
-        button { padding: 12px 24px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: transform 0.1s; }
-        button:active { transform: scale(0.95); }
-        
-        .btn-attack { background: #3498db; color: white; border-bottom: 4px solid #2980b9; }
-        .btn-attack:disabled { background: #bdc3c7; border: none; cursor: not-allowed; }
-        
-        /* Quiz Styling */
-        #quiz { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; position: relative; }
-        .option-btn { width: 100%; margin: 8px 0; background: #ecf0f1; border-bottom: 4px solid #d5dbdb; font-size: 18px; }
-        .option-btn:hover { background: #dde4e6; }
+        /* 2D Battlefield */
+        #battlefield-container { background: #27ae60; border-bottom: 5px solid #2ecc71; position: relative; height: 150px; width: 100%; overflow: hidden; }
+        canvas { display: block; }
 
-        /* Ice Effect Mini-Game */
+        /* Game UI */
+        #ui-layer { padding: 15px; background: #34495e; }
+        .elixir-bar { background: #222; border-radius: 20px; width: 200px; height: 25px; margin: 10px auto; position: relative; border: 2px solid #8e44ad; }
+        #elixir-progress { background: #ff00ff; width: 0%; height: 100%; border-radius: 18px; transition: width 0.3s; }
+        #elixir-text { position: absolute; width: 100%; text-align: center; top: 2px; font-weight: bold; color: white; text-shadow: 1px 1px 2px black; }
+
+        /* Quiz Styling */
+        #game-content { padding: 20px; max-width: 500px; margin: 0 auto; }
+        #quiz { background: white; color: #333; padding: 20px; border-radius: 15px; box-shadow: 0 10px 0 #bdc3c7; }
+        button { padding: 12px 20px; margin: 5px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; font-size: 16px; transition: 0.1s; }
+        .btn-blue { background: #3498db; color: white; border-bottom: 4px solid #2980b9; }
+        .btn-blue:disabled { background: #7f8c8d; border: none; }
+        .option-btn { width: 100%; background: #ecf0f1; color: #333; border-bottom: 4px solid #bdc3c7; }
+
+        /* Ice Overlay */
         #ice-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(135, 206, 250, 0.85); backdrop-filter: blur(10px);
+            background: rgba(135, 206, 250, 0.9); backdrop-filter: blur(5px);
             z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center;
-            color: white; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        #ice-content { background: rgba(255,255,255,0.2); padding: 30px; border-radius: 20px; border: 2px solid white; max-width: 400px; }
-        #ice-question { font-size: 24px; font-weight: bold; margin-bottom: 15px; color: #003366; background: white; padding: 15px; border-radius: 10px; }
-        .ice-btn { background: #fff; color: #2980b9; width: 80px; margin: 5px; font-size: 20px; }
-        .ice-btn:hover { background: #e0f7ff; }
 
-        /* Leaderboard */
-        #leaderboard { margin-top: 30px; border-top: 2px solid #ccc; padding-top: 10px; }
-        .score-entry { background: white; margin: 5px auto; padding: 10px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 300px; }
-        #pb-container { margin-bottom: 10px; color: #2c3e50; font-weight: bold; }
+        #leaderboard { background: rgba(0,0,0,0.3); padding: 10px; margin-top: 20px; border-radius: 10px; }
+        .score-entry { padding: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="ice-overlay">
-        <div id="ice-content">
-            <div style="font-size: 40px; margin-bottom: 10px;">❄️ FROZEN! ❄️</div>
-            <p>Solve 3 quick math problems to shatter the ice!</p>
-            <div id="ice-question">Loading...</div>
+        <div style="background: white; color: #2980b9; padding: 30px; border-radius: 20px;">
+            <h2>❄️ FROZEN! ❄️</h2>
+            <p>Solve 3 to break free!</p>
+            <div id="ice-question" style="font-size: 24px; margin-bottom: 10px; font-weight: bold;"></div>
             <div id="ice-options"></div>
-            <div id="ice-progress" style="margin-top: 15px; font-weight: bold;">Progress: 0/3</div>
         </div>
     </div>
 
-    <h1>Quiz Royale: Battle Mode</h1>
-
-    <div id="setup">
-        <input type="text" id="username" placeholder="Enter Name">
-        <button class="btn-attack" onclick="startQuiz()">Enter Arena</button>
+    <div id="battlefield-container">
+        <canvas id="battleCanvas"></canvas>
     </div>
 
-    <div id="game-ui" class="hidden">
-        <div class="elixir-container">💧 Elixir: <span id="elixir-count">0</span></div>
-        <button id="freeze-btn" class="btn-attack" onclick="useFreeze()" disabled>Freeze Others (5💧)</button>
+    <div id="ui-layer">
+        <div id="setup">
+            <input type="text" id="username" placeholder="Name" style="padding: 10px; border-radius: 5px;">
+            <button class="btn-blue" onclick="startQuiz()">Enter Arena</button>
+        </div>
+
+        <div id="game-stats" class="hidden">
+            <div class="elixir-bar">
+                <div id="elixir-progress"></div>
+                <div id="elixir-text">💧 0 / 10</div>
+            </div>
+            <button id="freeze-btn" class="btn-blue" onclick="spawnTroop()" disabled>Deploy Knight (5💧)</button>
+        </div>
     </div>
 
-    <div id="pb-container" class="hidden">
-        <span id="pb-text">Personal Best: None</span>
-    </div>
+    <div id="game-content">
+        <div id="quiz" class="hidden">
+            <h2 id="question">Loading...</h2>
+            <div id="options"></div>
+        </div>
 
-    <div id="quiz" class="hidden">
-        <h2 id="question">Loading...</h2>
-        <div id="options"></div>
-    </div>
+        <div id="results" class="hidden">
+            <h2>Finish!</h2>
+            <p id="final-time"></p>
+            <button class="btn-blue" onclick="restartMatch()">Next Match</button>
+        </div>
 
-    <div id="results" class="hidden">
-        <h2>Match Finished!</h2>
-        <p id="final-time"></p>
-        <button class="btn-attack" onclick="restartMatch()">Next Match (Keep Elixir)</button>
-    </div>
-
-    <div id="leaderboard">
-        <h3>🏆 Arena Rankings</h3>
-        <div id="leaderboard-list">Loading scores...</div>
+        <div id="leaderboard">
+            <div id="pb-text">Best: None</div>
+            <hr>
+            <div id="leaderboard-list">Loading Arena Rankings...</div>
+        </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://xpqbrytsxsswjabonbox.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwcWJyeXRzeHNzd2phYm9uYm94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMjg3NjUsImV4cCI6MjA4MTYwNDc2NX0.elSX1XfvfAAJZyW-6JBhMpONz1zuBBH7GZiV-Vax0EE';
-        
         const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const questions = [
-            { q: "What is 5 + 5?", a: ["10", "12", "8"], correct: "10" },
-            { q: "Which game uses 'Elixir'?", a: ["Chess", "Clash Royale", "Monopoly"], correct: "Clash Royale" },
-            { q: "What is the cost of a Freeze spell here?", a: ["3", "5", "10"], correct: "5" },
-            { q: "Best color for Elixir?", a: ["Red", "Green", "Pink/Purple"], correct: "Pink/Purple" }
-        ];
+        // --- CANVAS ENGINE ---
+        const canvas = document.getElementById('battleCanvas');
+        const ctx = canvas.getContext('2d');
+        let troops = [];
 
-        let currentQ = 0;
-        let startTime;
-        let username = "";
-        let personalBest = null;
-        let elixir = 0;
-        let iceAnswersCorrect = 0;
-        let isFrozen = false;
-
-        const arenaChannel = sbClient.channel('arena-room', {
-            config: { broadcast: { self: false } }
-        });
-
-        arenaChannel.on('broadcast', { event: 'freeze_attack' }, (payload) => {
-            applyFreezeEffect();
-        }).subscribe();
-
-        async function startQuiz() {
-            username = document.getElementById('username').value.trim();
-            if(!username) return alert("Enter a name!");
-            
-            document.getElementById('setup').classList.add('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
-            document.getElementById('pb-container').classList.remove('hidden');
-            document.getElementById('quiz').classList.remove('hidden');
-            
-            await fetchPersonalBest();
-            startTime = Date.now();
-            showQuestion();
-            updateElixirUI(); // Ensure button is correct state
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = 150;
         }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        // NEW: Soft Reset Function
-        function restartMatch() {
-            currentQ = 0;
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('quiz').classList.remove('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
-            startTime = Date.now();
-            showQuestion();
-        }
-
-        async function fetchPersonalBest() {
-            const { data } = await sbClient.from('scores').select('time_taken').eq('username', username).maybeSingle();
-            if (data) {
-                personalBest = data.time_taken;
-                document.getElementById('pb-text').innerText = `Personal Best: ${personalBest}s`;
-            }
-        }
-
-        function showQuestion() {
-            const qData = questions[currentQ];
-            document.getElementById('question').innerText = qData.q;
-            const optionsDiv = document.getElementById('options');
-            optionsDiv.innerHTML = '';
-            qData.a.forEach(opt => {
-                const btn = document.createElement('button');
-                btn.className = 'option-btn';
-                btn.innerText = opt;
-                btn.onclick = () => handleAnswer(opt);
-                optionsDiv.appendChild(btn);
+        function spawnTroopVisual(isMine = true) {
+            troops.push({
+                x: isMine ? 0 : canvas.width,
+                y: 75,
+                speed: isMine ? 3 : -3,
+                emoji: isMine ? '⚔️' : '🔥'
             });
         }
 
-        async function handleAnswer(choice) {
-            if(choice === questions[currentQ].correct) {
-                elixir += 2;
-                updateElixirUI();
-                currentQ++;
-                if(currentQ < questions.length) {
-                    showQuestion();
-                } else {
-                    finishQuiz();
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Bridge
+            ctx.fillStyle = '#8e44ad';
+            ctx.fillRect(0, 70, canvas.width, 10);
+
+            // Draw Troops
+            ctx.font = '30px serif';
+            troops.forEach((t, index) => {
+                t.x += t.speed;
+                ctx.fillText(t.emoji, t.x, t.y + 10);
+
+                // If my troop reaches the end, trigger attack
+                if (t.x > canvas.width && t.speed > 0) {
+                    sendAttack();
+                    troops.splice(index, 1);
                 }
-            } else {
-                alert("Wrong! Try again.");
-            }
+                // If enemy troop reaches me
+                if (t.x < 0 && t.speed < 0) {
+                    applyFreezeEffect();
+                    troops.splice(index, 1);
+                }
+            });
+            requestAnimationFrame(draw);
+        }
+        draw();
+
+        // --- GAME LOGIC ---
+        const questions = [
+            { q: "What is 10 + 10?", a: ["20", "21", "19"], correct: "20" },
+            { q: "Which is the main resource?", a: ["Gold", "Elixir", "Wood"], correct: "Elixir" },
+            { q: "Cost of a Knight?", a: ["3", "5", "8"], correct: "5" }
+        ];
+
+        let currentQ = 0, startTime, username = "", elixir = 0, isFrozen = false, iceCount = 0;
+
+        const arenaChannel = sbClient.channel('arena-room').on('broadcast', { event: 'freeze_attack' }, () => {
+            spawnTroopVisual(false); // Enemy troop appears!
+        }).subscribe();
+
+        function startQuiz() {
+            username = document.getElementById('username').value.trim();
+            if(!username) return alert("Enter Name");
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('game-stats').classList.remove('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            startTime = Date.now();
+            showQuestion();
+            startPassiveElixir();
+        }
+
+        function startPassiveElixir() {
+            setInterval(() => {
+                if (elixir < 10) {
+                    elixir += 0.5;
+                    updateElixirUI();
+                }
+            }, 1500);
+        }
+
+        function showQuestion() {
+            const q = questions[currentQ];
+            document.getElementById('question').innerText = q.q;
+            const optDiv = document.getElementById('options');
+            optDiv.innerHTML = '';
+            q.a.forEach(opt => {
+                const b = document.createElement('button');
+                b.className = 'option-btn';
+                b.innerText = opt;
+                b.onclick = () => {
+                    if(opt === q.correct) {
+                        elixir = Math.min(10, elixir + 2);
+                        updateElixirUI();
+                        currentQ++;
+                        if(currentQ < questions.length) showQuestion(); else finishQuiz();
+                    } else alert("Wrong!");
+                };
+                optDiv.appendChild(b);
+            });
         }
 
         function updateElixirUI() {
-            document.getElementById('elixir-count').innerText = elixir;
+            const perc = (elixir / 10) * 100;
+            document.getElementById('elixir-progress').style.width = perc + '%';
+            document.getElementById('elixir-text').innerText = `💧 ${Math.floor(elixir)} / 10`;
             document.getElementById('freeze-btn').disabled = (elixir < 5);
         }
 
-        function useFreeze() {
+        function spawnTroop() {
             if (elixir >= 5) {
                 elixir -= 5;
                 updateElixirUI();
-                arenaChannel.send({
-                    type: 'broadcast',
-                    event: 'freeze_attack',
-                    payload: { user: username }
-                });
+                spawnTroopVisual(true);
             }
+        }
+
+        function sendAttack() {
+            arenaChannel.send({ type: 'broadcast', event: 'freeze_attack', payload: { user: username } });
         }
 
         function applyFreezeEffect() {
             if (isFrozen) return;
-            isFrozen = true;
-            iceAnswersCorrect = 0;
+            isFrozen = true; iceCount = 0;
             document.getElementById('ice-overlay').style.display = 'flex';
-            document.getElementById('ice-progress').innerText = `Progress: 0/3`;
-            showIceQuestion();
+            showIceQ();
         }
 
-        function showIceQuestion() {
-            const n1 = Math.floor(Math.random() * 12) + 1;
-            const n2 = Math.floor(Math.random() * 12) + 1;
-            const correct = n1 + n2;
+        function showIceQ() {
+            const n1 = Math.floor(Math.random()*10), n2 = Math.floor(Math.random()*10), ans = n1+n2;
             document.getElementById('ice-question').innerText = `${n1} + ${n2} = ?`;
-            let opts = [correct, correct + 2, correct - 1].sort(() => Math.random() - 0.5);
-            const iceOptionsDiv = document.getElementById('ice-options');
-            iceOptionsDiv.innerHTML = '';
-            opts.forEach(o => {
-                const btn = document.createElement('button');
-                btn.className = 'ice-btn';
-                btn.innerText = o;
-                btn.onclick = () => {
-                    if (parseInt(o) === correct) {
-                        iceAnswersCorrect++;
-                        document.getElementById('ice-progress').innerText = `Progress: ${iceAnswersCorrect}/3`;
-                        if (iceAnswersCorrect >= 3) {
-                            isFrozen = false;
-                            document.getElementById('ice-overlay').style.display = 'none';
-                        } else {
-                            showIceQuestion();
-                        }
+            const div = document.getElementById('ice-options');
+            div.innerHTML = '';
+            [ans, ans+1, ans-1].sort(() => Math.random()-0.5).forEach(o => {
+                const b = document.createElement('button');
+                b.className = 'btn-blue'; b.innerText = o;
+                b.onclick = () => {
+                    if(parseInt(o) === ans) {
+                        iceCount++;
+                        if(iceCount >= 3) { isFrozen = false; document.getElementById('ice-overlay').style.display = 'none'; }
+                        else showIceQ();
                     }
                 };
-                iceOptionsDiv.appendChild(btn);
+                div.appendChild(b);
             });
         }
 
         async function finishQuiz() {
-            const timeTaken = (Date.now() - startTime) / 1000;
+            const time = (Date.now() - startTime)/1000;
             document.getElementById('quiz').classList.add('hidden');
-            // Note: We DON'T hide game-ui here so you can still attack people while looking at your results!
             document.getElementById('results').classList.remove('hidden');
-            document.getElementById('final-time').innerText = `Battle Time: ${timeTaken}s`;
+            document.getElementById('final-time').innerText = `Time: ${time}s`;
+            await sbClient.from('scores').upsert({ username, time_taken: time }, { onConflict: 'username' });
+            loadLeaderboard();
+        }
 
-            if (personalBest === null || timeTaken < personalBest) {
-                await sbClient.from('scores').upsert({ username: username, time_taken: timeTaken }, { onConflict: 'username' });
-                personalBest = timeTaken;
-                document.getElementById('pb-text').innerText = `New Record: ${timeTaken}s!`;
-            }
+        function restartMatch() {
+            currentQ = 0;
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            startTime = Date.now();
+            showQuestion();
         }
 
         async function loadLeaderboard() {
-            const { data } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(20);
-            const list = document.getElementById('leaderboard-list');
+            const { data } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(10);
             if (data) {
-                list.innerHTML = data.map((s, i) => {
-                    let medal = '';
-                    if (i === 0) medal = '🥇 ';
-                    else if (i === 1) medal = '🥈 ';
-                    else if (i === 2) medal = '🥉 ';
-                    return `<div class="score-entry">${medal}<strong>${s.username}</strong>: ${s.time_taken}s</div>`;
-                }).join('');
+                document.getElementById('leaderboard-list').innerHTML = data.map((s, i) => `<div class="score-entry">${i+1}. ${s.username}: ${s.time_taken}s</div>`).join('');
             }
         }
-
-        sbClient.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
-            loadLeaderboard();
-        }).subscribe();
-
         loadLeaderboard();
     </script>
 </body>
