@@ -359,7 +359,7 @@
         }
 
         async function loadLeaderboard() {
-            const { data } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(10);
+            const { data } = await sbClient.from('scores').select('*').order('time_taken', { ascending: true }).limit(20);
             if (data) {
                 document.getElementById('leaderboard-list').innerHTML = data.map((s, i) => 
                     `<div class="score-entry">${i+1}. <strong>${s.display_name}</strong> - ${s.time_taken}s</div>`
