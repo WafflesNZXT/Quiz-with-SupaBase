@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Royale Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
+        .hidden { display: none; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 5px; border: 1px solid #ddd; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        #leaderboard { margin-top: 30px; border-top: 2px solid #ccc; padding-top: 10px; }
+        .score-entry { background: white; margin: 5px auto; padding: 10px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 300px; }
+        #pb-container { margin: 15px; padding: 10px; color: #2c3e50; font-weight: bold; background: #e8f4fd; border-radius: 8px; display: inline-block; min-width: 200px; }
+    </style>
+</head>
+<body>
+
+    <h1>Quiz Royale: Speed Test</h1>
+    
+    <div id="setup">
+        <input type="text" id="username" placeholder="Enter Name">
+        <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+
+    <div id="quiz" class="hidden">
+        <h2 id="question">Loading...</h2>
+        <div id="options"></div>
+    </div>
+
+    <div id="results" class="hidden">
+        <h2>Finished!</h2>
+        <p id="final-time"></p>
+        <button onclick="location.reload()">Try Again</button>
+    </div>
+
+    <div id="pb-container" class="hidden">
+        <span id="pb-text">Personal Best: None</span>
+    </div>
+
+    <div id="leaderboard">
+        <h3>Live Leaderboard</h3>
+        <div id="leaderboard-list">Loading scores...</div>
+    </div>
+
+    <script>
+        // 1. CONFIGURE YOUR CREDENTIALS
+        const SUPABASE_URL = 'https://xpqbrytsxsswjabonbox.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwcWJyeXRzeHNzd2phYm9uYm94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMjg3NjUsImV4cCI6MjA4MTYwNDc2NX0.elSX1XfvfAAJZyW-6JBhMpONz1zuBBH7GZiV-Vax0EE';
+        
+        const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const questions = [
+            { q: "What is 5 + 5?", a: ["10", "12", "8"], correct: "10" },
+            { q: "Which game uses 'Elixir'?", a: ["Chess", "Clash Royale", "Monopoly"], correct: "Clash Royale" }
+        ];
+
+        let currentQ = 0;
+        let startTime;
+        let username = "";
+        let personalBest = null;
+
+        // 2. START THE QUIZ
+        async function startQuiz() {
+            username = document.getElementById('username').value.trim();
+            if(!username) return alert("Enter a name!");
+            
+            // Show PB container once we know the username
+            document.getElementById('pb-container').classList.remove('hidden');
+            await fetchPersonalBest();
+
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            startTime = Date.now();
+            showQuestion();
+        }
+
+        async function fetchPersonalBest() {
+            const { data, error } = await sbClient
+                .from('scores')
+                .select('time_taken')
+                .eq('username', username)
+                .maybeSingle(); // Gets one record or null
+            
+            if (data) {
+                personalBest = data.time_taken;
+                document.getElementById('pb-text').innerText = `Personal Best: ${personalBest}s`;
+            }
+        }
+
+        function showQuestion() {
+            const qData = questions[currentQ];
+            document.getElementById('question').innerText = qData.q;
+            const optionsDiv = document.getElementById('options');
+            optionsDiv.innerHTML = '';
+            qData.a.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.innerText = opt;
+                btn.onclick = () => handleAnswer(opt);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        async function handleAnswer(choice) {
+            if(choice === questions[currentQ].correct) {
+                currentQ++;
+                if(currentQ < questions.length) {
+                    showQuestion();
+                } else {
+                    finishQuiz();
+                }
+            } else {
+                alert("Wrong! Try again.");
+            }
+        }
+
+        async function finishQuiz() {
+            const timeTaken = (Date.now() - startTime) / 1000;
+            document.getElementById('quiz').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('final-time').innerText = `Your time: ${timeTaken}s`;
+
+            // 3. UPSERT LOGIC
+            // Only update database if it's a new user OR the new time is faster
+            if (personalBest === null || timeTaken < personalBest) {
+                const { error } = await sbClient
+                    .from('scores')
+                    .upsert({ username: username, time_taken: timeTaken }, { onConflict: 'username' });
+                
+                if (error) console.error("Error saving score:", error);
+                
+                personalBest = timeTaken;
+                document.getElementById('pb-text').innerText = `New Personal Best: ${timeTaken}s!`;
+            }
+        }
+
+        // 4. LOAD & LISTEN FOR CHANGES
+        async function loadLeaderboard() {
+            const { data, error } = await sbClient
+                .from('scores')
+                .select('*')
+                .order('time_taken', { ascending: true })
+                .limit(5);
+            
+            if (error) return console.error("Error loading leaderboard:", error);
+
+            const list = document.getElementById('leaderboard-list');
+            if (data && data.length > 0) {
+                list.innerHTML = data.map(s => `<div class="score-entry"><strong>${s.username}</strong>: ${s.time_taken}s</div>`).join('');
+            } else {
+                list.innerHTML = "No scores yet. Be the first!";
+            }
+        }
+
+        // Listen for all changes (updates/inserts)
+        sbClient.channel('custom-all-channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
+            loadLeaderboard();
+          }).subscribe();
+
+        loadLeaderboard();
+    </script>
+</body>
+</html>
