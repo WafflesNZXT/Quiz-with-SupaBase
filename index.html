@@ -141,7 +141,7 @@
                 .from('scores')
                 .select('*')
                 .order('time_taken', { ascending: true })
-                .limit(10);
+                .limit(20);
             
             if (error) return console.error("Error loading leaderboard:", error);
 
